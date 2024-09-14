@@ -1,12 +1,8 @@
-.gen_grid <- function(dim = 16, fill_val = 0) {
+.gen_grid <- function(dim = 16, fill_val = 0:1) {
   matrix(rep(fill_val, dim ^ 2), dim)
 }
 
-.gen_image <- function(
-    mat = pixel_matrix(),
-    col_0 = "grey95",
-    col_1 = "grey10"
-) {
+.gen_image <- function(mat, col_0, col_1) {
 
   graphics::par(mar = rep(0, 4))
 
@@ -24,7 +20,7 @@
 
 }
 
-.gen_ablines <- function(mat = pixel_matrix(), dim = c("x", "y")) {
+.gen_ablines <- function(mat, dim = c("x", "y")) {
 
   dim_n <- ncol(mat)
   if (dim == "y") dim_n <- nrow(mat)
@@ -42,7 +38,7 @@
 
 }
 
-.get_pixel_coords <- function(mat = pixel_matrix(), coords = point_coords()) {
+.get_pixel_coords <- function(mat, point_coords) {
 
   # Pixel centres
   x_n    <- ncol(mat)  # number of pixels in the x dimension
@@ -53,8 +49,8 @@
   y_mids <- seq(0, 1, y_unit)
 
   # Calculate distances xy from clicked point to pixel centres
-  x_diffs <- abs(coords[["x"]] - x_mids)
-  y_diffs <- rev(abs(coords[["y"]] - y_mids))
+  x_diffs <- abs(point_coords[["x"]] - x_mids)
+  y_diffs <- rev(abs(point_coords[["y"]] - y_mids))
 
   # Identify pixel closest to click
   pixel_coords <- list(x = which.min(x_diffs), y = which.min(y_diffs))
@@ -63,57 +59,104 @@
 
 }
 
-.gen_updated_pixel_matrix <- function(
-    mat = pixel_matrix(),
-    coords = pixel_coords()
-) {
+.gen_updated_pixel_matrix <- function(mat, pixel_coords) {
   matrix_updated <- mat
-  new_value <- matrix_updated[coords[["y"]], coords[["x"]]] + 1
+  new_value <- matrix_updated[pixel_coords[["y"]], pixel_coords[["x"]]] + 1
   if (new_value > 1) new_value <- 0
-  matrix_updated[coords[["y"]], coords[["x"]]] <- new_value
+  matrix_updated[pixel_coords[["y"]], pixel_coords[["x"]]] <- new_value
   matrix_updated
 }
 
 ui <- shiny::fluidPage(
   htmltools::h1("little pixel fun zone"),
-  htmltools::p("by", htmltools::a("matt", href = "https://www.matt-dray.com", target = "_blank")),
-  shiny::plotOutput("pixel_grid", 400, 400, shiny::clickOpts("clicked_point", TRUE)),
+  htmltools::p(
+    "by",
+    htmltools::a("matt", href = "https://www.matt-dray.com", target = "_blank")
+  ),
+  shiny::plotOutput(
+    "pixel_grid",
+    400,
+    400,
+    shiny::clickOpts("clicked_point", TRUE)
+  ),
   htmltools::br(),
+  shiny::actionButton("button_undo", shiny::icon("rotate-left")),
   shiny::actionButton("button_clear", shiny::icon("broom")),
   shiny::actionButton("button_fill", shiny::icon("fill-drip")),
   shiny::actionButton("button_robot", shiny::icon("robot")),
-  shiny::downloadButton("button_download", NULL, icon = shiny::icon("floppy-disk"))
+  shiny::downloadButton(
+    "button_download",
+    NULL,
+    icon = shiny::icon("floppy-disk")
+  )
 )
 
 server <- function(input, output, session) {
 
   # Reactives
 
-  pixel_matrix <- shiny::reactiveVal(.gen_grid(16, 0))
+  pixel_matrices <- shiny::reactiveValues(slot1 = .gen_grid(16, 0))
 
   point_coords <- shiny::reactive({
     list(x = input$clicked_point[["x"]], y = input$clicked_point[["y"]])
   })
 
   pixel_coords <- shiny::reactive({
-    .get_pixel_coords(pixel_matrix(), point_coords())
+    .get_pixel_coords(pixel_matrices[["slot1"]], point_coords())
   })
+
+  undo_button_icon <- shiny::reactiveVal("rotate-left")
 
   # Observers
 
   shiny::observeEvent(input$clicked_point, {
-    matrix_updated <- .gen_updated_pixel_matrix(pixel_matrix(), pixel_coords())
-    pixel_matrix(matrix_updated)
+    matrix_updated <- .gen_updated_pixel_matrix(
+      shiny::isolate(pixel_matrices[["slot1"]]),
+      pixel_coords()
+    )
+    pixel_matrices[["slot2"]] <- pixel_matrices[["slot1"]]
+    pixel_matrices[["slot1"]] <- matrix_updated
   })
 
-  shiny::observeEvent(input$button_clear, pixel_matrix(.gen_grid(16, 0)))
+  shiny::observeEvent(
+    input$button_undo, {
 
-  shiny::observeEvent(input$button_fill, pixel_matrix(.gen_grid(16, 1)))
+      # Switch 'memory' slots
+      slot1 <- pixel_matrices[["slot1"]]
+      slot2 <- pixel_matrices[["slot2"]]
+      pixel_matrices[["slot2"]] <- slot1
+      pixel_matrices[["slot1"]] <- slot2
+
+      # Invert undo/redo icon
+
+      current_icon <- undo_button_icon()
+      if (current_icon == "rotate-left") undo_button_icon("rotate-right")
+      if (current_icon == "rotate-right") undo_button_icon("rotate-left")
+
+      shiny::updateActionButton(
+        inputId = "button_undo",
+        icon = shiny::icon(undo_button_icon())
+      )
+
+    })
+
+  shiny::observeEvent(
+    input$button_clear, {
+      matrix_cleared <- .gen_grid(16, 0)
+      pixel_matrices[["slot2"]] <- pixel_matrices[["slot1"]]
+      pixel_matrices[["slot1"]] <- matrix_cleared
+    })
+
+  shiny::observeEvent(input$button_fill, {
+    matrix_filled <- .gen_grid(16, 1)
+    pixel_matrices[["slot2"]] <- pixel_matrices[["slot1"]]
+    pixel_matrices[["slot1"]] <- matrix_filled
+  })
 
   shiny::observeEvent(input$button_robot, {
-    img <- matrix(sample(0:1, 16 ^ 2, TRUE), 16)
+    matrix_botted <- matrix(sample(0:1, 16 ^ 2, TRUE), 16)
     if (sample(c(TRUE, FALSE), 1, prob = c(0.1, 0.9))) {
-      img <- matrix(
+      matrix_botted <- matrix(
         c(
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
           1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -131,13 +174,14 @@ server <- function(input, output, session) {
         16
       )
     }
-    pixel_matrix(img)
+    pixel_matrices[["slot2"]] <- pixel_matrices[["slot1"]]
+    pixel_matrices[["slot1"]] <- matrix_botted
   })
 
   # Outputs
 
   output$pixel_grid <- shiny::renderPlot({
-    .gen_image(pixel_matrix(), "grey95", "grey10")
+    .gen_image(pixel_matrices[["slot1"]], "grey95", "grey10")
   })
 
   output$button_download <- downloadHandler(
@@ -147,7 +191,7 @@ server <- function(input, output, session) {
     content = function(file) {
       ppi <- 300
       png(file, width = 4 * ppi, height = 4 * ppi, res = ppi)
-      .gen_image(pixel_matrix(), "grey95", "grey10")
+      .gen_image(pixel_matrices[["slot1"]], "grey95", "grey10")
       dev.off()
     }
   )
