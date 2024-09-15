@@ -136,9 +136,14 @@ ui <- shiny::fluidPage(
   shiny::actionButton("button_fill", shiny::icon("fill-drip")),
   shiny::actionButton("button_robot", shiny::icon("robot")),
   shiny::downloadButton(
-    "button_download",
+    "button_download_matrix",
     NULL,
-    icon = shiny::icon("floppy-disk")
+    icon = shiny::icon("file-code")
+  ),
+  shiny::downloadButton(
+    "button_download_img",
+    NULL,
+    icon = shiny::icon("file-image")
   )
 )
 
@@ -210,7 +215,16 @@ server <- function(input, output, session) {
     .gen_image(pixel_matrices[["slot1"]])
   })
 
-  output$button_download <- downloadHandler(
+  output$button_download_matrix <- downloadHandler(
+    filename = function() {
+      paste0(format(Sys.time(), "%Y-%m-%d-%H%M%S"), "_treasured-art_matrix.rds")
+    },
+    content = function(file) {
+      readr::write_rds(.convert_hex2pxltrx(pixel_matrices[["slot1"]]), file)
+    }
+  )
+
+  output$button_download_img <- downloadHandler(
     filename = function() {
       paste0(format(Sys.time(), "%Y-%m-%d-%H%M%S"), "_treasured-art.png")
     },
