@@ -5,10 +5,16 @@
 .convert_hex2pxltrx <- function(mat) {
   unique_colours <- unique(as.character(mat))
   colour_lookup <- setNames(seq(length(unique_colours)) - 1, unique_colours)
+  colour_attribute <- setNames(unique_colours, seq(length(unique_colours)) - 1)
   new_mat <- matrix(colour_lookup[mat], ncol(mat))
-  attr(new_mat, "colours") <- unique_colours
+  attr(new_mat, "colours") <- colour_attribute
   class(new_mat) <- "pixeltrix"
   new_mat
+}
+
+.convert_pxltrx2hex <- function(mat) {
+  colour_lookup <- attributes(mat)[["colours"]]
+  matrix(colour_lookup[as.character(mat)], ncol(mat))
 }
 
 .gen_image <- function(mat) {
@@ -220,7 +226,7 @@ server <- function(input, output, session) {
       paste0(format(Sys.time(), "%Y-%m-%d-%H%M%S"), "_treasured-art_matrix.rds")
     },
     content = function(file) {
-      readr::write_rds(.convert_hex2pxltrx(pixel_matrices[["slot1"]]), file)
+      saveRDS(.convert_hex2pxltrx(pixel_matrices[["slot1"]]), file)
     }
   )
 
