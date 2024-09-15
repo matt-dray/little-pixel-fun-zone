@@ -1,15 +1,29 @@
-.gen_grid <- function(dim = 16, fill_val = 0:1) {
+.gen_grid <- function(dim = 16, fill_val = "#E5E5E5") {
   matrix(rep(fill_val, dim ^ 2), dim)
 }
 
-.gen_image <- function(mat, col_0, col_1) {
+.convert_hex2pxltrx <- function(mat) {
+  unique_colours <- unique(as.character(mat))
+  colour_lookup <- setNames(seq(length(unique_colours)) - 1, unique_colours)
+  new_mat <- matrix(colour_lookup[mat], ncol(mat))
+  attr(new_mat, "colours") <- unique_colours
+  class(new_mat) <- "pixeltrix"
+  new_mat
+}
+
+.gen_image <- function(mat) {
+
+  mat_pxltrx <- .convert_hex2pxltrx(mat)
+  mat_colours <- attributes(mat_pxltrx)[["colours"]]
+  n_colours <- length(mat_colours)
+  mat_invert <- t(mat_pxltrx[seq(nrow(mat_pxltrx), 1), ])
 
   graphics::par(mar = rep(0, 4))
 
   graphics::image(
-    t(mat[seq(nrow(mat), 1), ]),  # invert to line up click with matrix
-    zlim = c(0, 1),
-    col  = c(col_0, col_1),
+    mat_invert,
+    zlim = c(0, n_colours - 1),
+    col  = mat_colours,
     axes = FALSE,
     xlab = "",
     ylab = ""
@@ -59,12 +73,42 @@
 
 }
 
-.gen_updated_pixel_matrix <- function(mat, pixel_coords) {
-  matrix_updated <- mat
-  new_value <- matrix_updated[pixel_coords[["y"]], pixel_coords[["x"]]] + 1
-  if (new_value > 1) new_value <- 0
-  matrix_updated[pixel_coords[["y"]], pixel_coords[["x"]]] <- new_value
-  matrix_updated
+.gen_updated_pixel_matrix <- function(mat, pixel_coords, selected_colour) {
+  new_value <- selected_colour
+  mat[pixel_coords[["y"]], pixel_coords[["x"]]] <- new_value
+  mat
+}
+
+.gen_bot_pixel_matrix <- function() {
+
+  rand_colour <- sample(c("#FF0000", "#00FF00", "#0000FF", "#000000"), 1)
+  colour_lookup <- setNames(c("#E5E5E5", rand_colour), 0:1)
+
+  vec <- sample(c(0, 1), 16 ^ 2, TRUE)
+
+  if (sample(c(TRUE, FALSE), 1, prob = c(0.1, 0.9))) {
+    vec <- c(
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+      0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+      0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0,
+      0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0,
+      0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0,
+      0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0,
+      0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0,
+      0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0,
+      0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0,
+      0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0,
+      0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+      0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
+      0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    )
+  }
+
+  matrix(colour_lookup[as.character(vec)], 16)
+
 }
 
 ui <- shiny::fluidPage(
@@ -75,13 +119,20 @@ ui <- shiny::fluidPage(
   ),
   shiny::plotOutput(
     "pixel_grid",
-    400,
-    400,
+    380,
+    380,
     shiny::clickOpts("clicked_point", TRUE)
   ),
   htmltools::br(),
+  colourpicker::colourInput(
+    "selected_colour",
+    NULL,
+    "black",
+    palette = "limited",
+    returnName = TRUE,
+    width = 120
+  ),
   shiny::actionButton("button_undo", shiny::icon("rotate-left")),
-  shiny::actionButton("button_clear", shiny::icon("broom")),
   shiny::actionButton("button_fill", shiny::icon("fill-drip")),
   shiny::actionButton("button_robot", shiny::icon("robot")),
   shiny::downloadButton(
@@ -95,7 +146,7 @@ server <- function(input, output, session) {
 
   # Reactives
 
-  pixel_matrices <- shiny::reactiveValues(slot1 = .gen_grid(16, 0))
+  pixel_matrices <- shiny::reactiveValues(slot1 = .gen_grid(16, "#E5E5E5"))
 
   point_coords <- shiny::reactive({
     list(x = input$clicked_point[["x"]], y = input$clicked_point[["y"]])
@@ -112,7 +163,8 @@ server <- function(input, output, session) {
   shiny::observeEvent(input$clicked_point, {
     matrix_updated <- .gen_updated_pixel_matrix(
       shiny::isolate(pixel_matrices[["slot1"]]),
-      pixel_coords()
+      pixel_coords(),
+      input$selected_colour
     )
     pixel_matrices[["slot2"]] <- pixel_matrices[["slot1"]]
     pixel_matrices[["slot1"]] <- matrix_updated
@@ -140,48 +192,22 @@ server <- function(input, output, session) {
 
     })
 
-  shiny::observeEvent(
-    input$button_clear, {
-      matrix_cleared <- .gen_grid(16, 0)
-      pixel_matrices[["slot2"]] <- pixel_matrices[["slot1"]]
-      pixel_matrices[["slot1"]] <- matrix_cleared
-    })
-
   shiny::observeEvent(input$button_fill, {
-    matrix_filled <- .gen_grid(16, 1)
+    matrix_filled <- .gen_grid(16, input$selected_colour)
     pixel_matrices[["slot2"]] <- pixel_matrices[["slot1"]]
     pixel_matrices[["slot1"]] <- matrix_filled
   })
 
   shiny::observeEvent(input$button_robot, {
-    matrix_botted <- matrix(sample(0:1, 16 ^ 2, TRUE), 16)
-    if (sample(c(TRUE, FALSE), 1, prob = c(0.1, 0.9))) {
-      matrix_botted <- matrix(
-        c(
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
-          1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-          0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1,
-          0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0,
-          1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1,
-          1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-          0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0,
-          0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0,
-          1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
-          0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1,
-          1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-          0, 0, 0
-        ),
-        16
-      )
-    }
+    matrix_by_bot <- .gen_bot_pixel_matrix()
     pixel_matrices[["slot2"]] <- pixel_matrices[["slot1"]]
-    pixel_matrices[["slot1"]] <- matrix_botted
+    pixel_matrices[["slot1"]] <- matrix_by_bot
   })
 
   # Outputs
 
   output$pixel_grid <- shiny::renderPlot({
-    .gen_image(pixel_matrices[["slot1"]], "grey95", "grey10")
+    .gen_image(pixel_matrices[["slot1"]])
   })
 
   output$button_download <- downloadHandler(
@@ -191,7 +217,7 @@ server <- function(input, output, session) {
     content = function(file) {
       ppi <- 300
       png(file, width = 4 * ppi, height = 4 * ppi, res = ppi)
-      .gen_image(pixel_matrices[["slot1"]], "grey95", "grey10")
+      .gen_image(pixel_matrices[["slot1"]])
       dev.off()
     }
   )
