@@ -5,10 +5,16 @@
 .convert_hex2pxltrx <- function(mat) {
   unique_colours <- unique(as.character(mat))
   colour_lookup <- setNames(seq(length(unique_colours)) - 1, unique_colours)
+  colour_attribute <- setNames(unique_colours, seq(length(unique_colours)) - 1)
   new_mat <- matrix(colour_lookup[mat], ncol(mat))
-  attr(new_mat, "colours") <- unique_colours
+  attr(new_mat, "colours") <- colour_attribute
   class(new_mat) <- "pixeltrix"
   new_mat
+}
+
+.convert_pxltrx2hex <- function(mat) {
+  colour_lookup <- attributes(mat)[["colours"]]
+  matrix(colour_lookup[as.character(mat)], ncol(mat))
 }
 
 .gen_image <- function(mat) {
@@ -136,9 +142,14 @@ ui <- shiny::fluidPage(
   shiny::actionButton("button_fill", shiny::icon("fill-drip")),
   shiny::actionButton("button_robot", shiny::icon("robot")),
   shiny::downloadButton(
-    "button_download",
+    "button_download_matrix",
     NULL,
-    icon = shiny::icon("floppy-disk")
+    icon = shiny::icon("file-code")
+  ),
+  shiny::downloadButton(
+    "button_download_img",
+    NULL,
+    icon = shiny::icon("file-image")
   )
 )
 
@@ -210,7 +221,16 @@ server <- function(input, output, session) {
     .gen_image(pixel_matrices[["slot1"]])
   })
 
-  output$button_download <- downloadHandler(
+  output$button_download_matrix <- downloadHandler(
+    filename = function() {
+      paste0(format(Sys.time(), "%Y-%m-%d-%H%M%S"), "_treasured-art_matrix.rds")
+    },
+    content = function(file) {
+      saveRDS(.convert_hex2pxltrx(pixel_matrices[["slot1"]]), file)
+    }
+  )
+
+  output$button_download_img <- downloadHandler(
     filename = function() {
       paste0(format(Sys.time(), "%Y-%m-%d-%H%M%S"), "_treasured-art.png")
     },
