@@ -161,13 +161,22 @@ server <- function(input, output, session) {
   # Observers
 
   shiny::observeEvent(input$clicked_point, {
+
     matrix_updated <- .gen_updated_pixel_matrix(
       shiny::isolate(pixel_matrices[["slot1"]]),
       pixel_coords(),
       input$selected_colour
     )
+
     pixel_matrices[["slot2"]] <- pixel_matrices[["slot1"]]
     pixel_matrices[["slot1"]] <- matrix_updated
+
+    undo_button_icon("rotate-left")
+    shiny::updateActionButton(
+      inputId = "button_undo",
+      icon = shiny::icon(undo_button_icon())
+    )
+
   })
 
   shiny::observeEvent(
@@ -193,15 +202,33 @@ server <- function(input, output, session) {
     })
 
   shiny::observeEvent(input$button_fill, {
+
     matrix_filled <- .gen_grid(16, input$selected_colour)
+
     pixel_matrices[["slot2"]] <- pixel_matrices[["slot1"]]
     pixel_matrices[["slot1"]] <- matrix_filled
+
+    undo_button_icon("rotate-left")
+    shiny::updateActionButton(
+      inputId = "button_undo",
+      icon = shiny::icon(undo_button_icon())
+    )
+
   })
 
   shiny::observeEvent(input$button_robot, {
+
     matrix_by_bot <- .gen_bot_pixel_matrix()
+
     pixel_matrices[["slot2"]] <- pixel_matrices[["slot1"]]
     pixel_matrices[["slot1"]] <- matrix_by_bot
+
+    undo_button_icon("rotate-left")
+    shiny::updateActionButton(
+      inputId = "button_undo",
+      icon = shiny::icon(undo_button_icon())
+    )
+
   })
 
   # Outputs
