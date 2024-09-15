@@ -133,7 +133,6 @@ ui <- shiny::fluidPage(
     width = 120
   ),
   shiny::actionButton("button_undo", shiny::icon("rotate-left")),
-  shiny::actionButton("button_clear", shiny::icon("broom")),
   shiny::actionButton("button_fill", shiny::icon("fill-drip")),
   shiny::actionButton("button_robot", shiny::icon("robot")),
   shiny::downloadButton(
@@ -193,15 +192,8 @@ server <- function(input, output, session) {
 
     })
 
-  shiny::observeEvent(
-    input$button_clear, {
-      matrix_cleared <- .gen_grid(16, "#E5E5E5")
-      pixel_matrices[["slot2"]] <- pixel_matrices[["slot1"]]
-      pixel_matrices[["slot1"]] <- matrix_cleared
-    })
-
   shiny::observeEvent(input$button_fill, {
-    matrix_filled <- .gen_grid(16, "#000000")
+    matrix_filled <- .gen_grid(16, input$selected_colour)
     pixel_matrices[["slot2"]] <- pixel_matrices[["slot1"]]
     pixel_matrices[["slot1"]] <- matrix_filled
   })
