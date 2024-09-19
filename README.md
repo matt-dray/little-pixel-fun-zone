@@ -14,4 +14,4 @@ Built with [{shiny}](https://shiny.posit.co/) and prepared for serverless deploy
 
 Intended for learning purposes. Read more in [the accompanying blog post](https://www.rostrum.blog/posts/2024-09-15-shiny-pixel/). May never be 'finished'.
 
-![](img/SANIC.png){fig-align="left" fig.alt="Screenshot of a web app called 'little pixel fun zone'. in the centre is a child's drawing of the fast blue hedgehog rendered in blocky square pixels. Under the image are some buttons to select a colour, undo, fill and downloade outputs." width='50%'}
+<img src='img/SANIC.png' alt="Screenshot of a web app called 'little pixel fun zone'. in the centre is a child's drawing of the fast blue hedgehog rendered in blocky square pixels. Under the image are some buttons to select a colour, undo, fill and downloade outputs." width='50%'>
